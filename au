@@ -1,0 +1,159 @@
+-- [[ AZHub: Build and Kill Zombies Automation Suite ]]
+local AZHub = {}
+AZHub.Version = "1.0.0"
+AZHub.Toggled = {
+    AutoKill = false,
+    AutoDrive = false,
+    AutoRoll = false
+}
+
+-- Create the UI Interface Container
+local ScreenGui = Instance.new("ScreenGui")
+local MainFrame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local KillBtn = Instance.new("TextButton")
+local DriveBtn = Instance.new("TextButton")
+local RollBtn = Instance.new("TextButton")
+local Credits = Instance.new("TextLabel")
+
+-- Setup Screen UI Properties
+ScreenGui.Name = "AZHub_UI"
+ScreenGui.Parent = game:GetService("CoreGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ResetOnSpawn = false
+
+MainFrame.Name = "MainFrame"
+MainFrame.Parent = ScreenGui
+MainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+MainFrame.Position = UDim2.new(0.05, 0, 0.3, 0)
+MainFrame.Size = UDim2.new(0, 220, 0, 280)
+MainFrame.Active = true
+MainFrame.Draggable = true -- Allows you to drag the menu around your screen
+
+Title.Name = "Title"
+Title.Parent = MainFrame
+Title.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Font = Enum.Font.SourceSansBold
+Title.Text = "AZHub v" .. AZHub.Version
+Title.TextColor3 = Color3.fromRGB(0, 255, 150)
+Title.TextSize = 20.000
+
+-- Helper function to stylize buttons quickly
+local function CreateButton(btn, text, posy)
+    btn.Parent = MainFrame
+    btn.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    btn.Position = UDim2.new(0.05, 0, 0, posy)
+    btn.Size = UDim2.new(0.9, 0, 0, 45)
+    btn.Font = Enum.Font.SourceSans
+    btn.Text = text .. ": OFF"
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 16.000
+    
+    -- Smooth button edges
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = btn
+end
+
+CreateButton(KillBtn, "Auto Kill Zombies", 60)
+CreateButton(DriveBtn, "Auto Drive Car", 115)
+CreateButton(RollBtn, "Auto Roll / Upgrade", 170)
+
+Credits.Name = "Credits"
+Credits.Parent = MainFrame
+Credits.BackgroundTransparency = 1.000
+Credits.Position = UDim2.new(0, 0, 1, -30)
+Credits.Size = UDim2.new(1, 0, 0, 25)
+Credits.Font = Enum.Font.SourceSansItalic
+Credits.Text = "Press RightShift to Hide Menu"
+Credits.TextColor3 = Color3.fromRGB(150, 150, 150)
+Credits.TextSize = 14.000
+
+-- UI Toggle Visiblity Keybind (RightShift)
+game:GetService("UserInputService").InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.RightShift then
+        MainFrame.Visible = not MainFrame.Visible
+    end
+end)
+
+-- [[ AUTOMATION LOGIC LOOPS ]]
+
+-- 1. Auto Kill Loop (Targets closest enemy models)
+task.spawn(function()
+    while task.wait(0.5) do
+        if AZHub.Toggled.AutoKill then
+            pcall(function()
+                local enemies = workspace:FindFirstChild("Zombies") or workspace:FindFirstChild("Enemies")
+                if enemies then
+                    for _, zombie in pairs(enemies:GetChildren()) do
+                        local hrp = zombie:FindFirstChild("HumanoidRootPart")
+                        local localHrp = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if hrp and localHrp and (localHrp.Position - hrp.Position).Magnitude < 100 then
+                            -- Fires game remote to hit or damage the zombie
+                            local combatRemote = game:GetService("ReplicatedStorage"):FindFirstChild("HitRemote") or game:GetService("ReplicatedStorage"):FindFirstChild("Damage")
+                            if combatRemote then
+                                combatRemote:FireServer(zombie)
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- 2. Auto Drive Loop (Simulates linear vehicle progression velocity)
+task.spawn(function()
+    while task.wait(0.1) do
+        if AZHub.Toggled.AutoDrive then
+            pcall(function()
+                local playerTrack = workspace:FindFirstChild("Tracks") -- Searches for map infrastructure
+                local myCar = workspace:FindFirstChild(game.Players.LocalPlayer.Name .. "'s Car") or workspace:FindFirstChild("Vehicles")
+                
+                if myCar then
+                    local primary = myCar:FindFirstChild("DriveSeat") or myCar.PrimaryPart
+                    if primary and primary:IsA("BasePart") then
+                        -- Appends continuous physics force forward down the tracks
+                        primary.AssemblyLinearVelocity = primary.CFrame.LookVector * 120
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- 3. Auto Roll Loop (Fires the server roll event handlers)
+task.spawn(function()
+    while task.wait(1) do
+        if AZHub.Toggled.AutoRoll then
+            pcall(function()
+                local rollRemote = game:GetService("ReplicatedStorage"):FindFirstChild("Roll") or game:GetService("ReplicatedStorage"):FindFirstChild("BuyUpgrade")
+                if rollRemote then
+                    rollRemote:FireServer("StandardRoll")
+                end
+            end)
+        end
+    end
+end)
+
+-- [[ UI BUTTON LOGIC BINDINGS ]]
+
+KillBtn.MouseButton1Click:Connect(function()
+    AZHub.Toggled.AutoKill = not AZHub.Toggled.AutoKill
+    KillBtn.Text = "Auto Kill Zombies: " .. (AZHub.Toggled.AutoKill and "ON" or "OFF")
+    KillBtn.TextColor3 = AZHub.Toggled.AutoKill and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 255, 255)
+end)
+
+DriveBtn.MouseButton1Click:Connect(function()
+    AZHub.Toggled.AutoDrive = not AZHub.Toggled.AutoDrive
+    DriveBtn.Text = "Auto Drive Car: " .. (AZHub.Toggled.AutoDrive and "ON" or "OFF")
+    DriveBtn.TextColor3 = AZHub.Toggled.AutoDrive and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 255, 255)
+end)
+
+RollBtn.MouseButton1Click:Connect(function()
+    AZHub.Toggled.AutoRoll = not AZHub.Toggled.AutoRoll
+    RollBtn.Text = "Auto Roll / Upgrade: " .. (AZHub.Toggled.AutoRoll and "ON" or "OFF")
+    RollBtn.TextColor3 = AZHub.Toggled.AutoRoll and Color3.fromRGB(0, 255, 150) or Color3.fromRGB(255, 255, 255)
+end)
+
+print("AZHub successfully loaded into the game environment.")
